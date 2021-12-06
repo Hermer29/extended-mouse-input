@@ -1,15 +1,25 @@
-﻿using System;
+﻿using Rubicks.Extensions;
+using Rubicks.Extensions.Disposing;
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
-namespace Sensors
+namespace Rubicks.ExtendedPointerInput
 {
-    public class HoldPullSensor : MonoBehaviour
+    public class HoldPullSensor : MonoBehaviour, IObservable<PressState>
     {
         private PressState _pressState;
+        private List<IObserver<PressState>> _observers = new List<IObserver<PressState>>();
 
         public event Action Started;
-        public event Action Holds;
+        public event Action Pressed;
         public event Action Finished;
+
+        public IDisposable Subscribe(IObserver<PressState> observer)
+        {
+            _observers.Add(observer);
+            return Disposable.Create(() => _observers.Remove(observer));
+        }
 
         private void Update()
         {
@@ -18,22 +28,24 @@ namespace Sensors
             {
                 _pressState = PressState.Hold;
                 Started?.Invoke();
+                Notify(PressState.Started);
             }
             else if (isMouseButtonPressed && _pressState == PressState.Hold)
             {
-                Holds?.Invoke();
+                Pressed?.Invoke();
+                Notify(PressState.Hold);
             }
             else if (!isMouseButtonPressed && _pressState == PressState.Hold)
             {
                 _pressState = PressState.None;
                 Finished?.Invoke();
+                Notify(PressState.Canceled);
             }
         }
-    }
 
-    public enum PressState
-    {
-        Hold,
-        None
+        private void Notify(PressState state)
+        {
+            _observers.Notify(state);
+        }
     }
 }
